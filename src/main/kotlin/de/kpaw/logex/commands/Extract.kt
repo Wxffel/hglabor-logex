@@ -22,11 +22,11 @@ object Extract : CliktCommand(
 ) {
     private val inputPath by argument(help = "The path of the folder to extract lines from").path(
         mustExist = true, canBeFile = false
-    ).default(Path.of("${System.getProperty("user.home")}\\AppData\\Roaming\\.minecraft\\logs"))
+    ).default(Path.of("${System.getProperty("user.home")}\\AppData\\Roaming\\.minecraft\\logs")) // trash
 
     private val outputPath by argument(help = "The path where to put the output file").path(
         mustExist = true, canBeFile = false
-    ).default(Path.of("${System.getProperty("user.home")}\\Desktop\\"))
+    ).default(Path.of("${System.getProperty("user.home")}\\Desktop\\")) // trash
 
     private val outputFileName by option(
         "-of", "--outputfilename",
