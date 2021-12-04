@@ -17,8 +17,6 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.zip.ZipFile
 import kotlin.system.measureTimeMillis
 
-// extract /home/keanu/Minecraft-Log-Data/Potato/wuffel-1/ /home/keanu/Minecraft-Log-Data/Potato/results/ -of=
-
 object Extract : CliktCommand(
     help = "Extracts specified lines of files"
 ) {
