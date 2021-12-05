@@ -8,8 +8,16 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipFile
 
+data class MinecraftLog(
+    val name: String,
+    val content: List<String>,
+    val creationDateFromAttributes: String
+) {
+    val creationDateFromName: String = name.split("-").dropLast(1).joinToString("-")
+}
+
 object InputFileUtils {
-    fun inputFilesToMinecraftLogs(path: String, startDate: String = hgLaborStartDate, charset: Charset): List<MinecraftLog> {
+    fun inputFilesToMinecraftLogs(path: String, startDate: String = hgLaborStartDate, charset: Charset = defaultCharset): List<MinecraftLog> {
         val pathContent = File(path).list() ?: kotlin.run {
             TerminalMessages.noFilesFound(path = "$path/")
             return listOf()
@@ -38,7 +46,7 @@ object InputFileUtils {
 
                 it.name.endsWith(".log") -> {
                     terminal.println(TextColors.brightBlue("End with log: ${it.name}"))
-                    MinecraftLog(it.name, it.readLines(charset).toHashSet(), it.creationTimeFromAttr())
+                    MinecraftLog(it.name, it.readLines(charset), it.creationTimeFromAttr())
                 }
 
                 else -> {
@@ -60,7 +68,7 @@ object InputFileUtils {
     private fun ZipFile.unzip(charset: Charset): MinecraftLog {
         val entry = this.entries().toList().first() // getting the first entry, should be the log
         val zipFileBytes = this.getInputStream(entry).readAllBytes()
-        val entryContent = String(zipFileBytes, charset).split("\n").toHashSet()
+        val entryContent = String(zipFileBytes, charset).split("\n")
         val creationTime = entry.toString().split("T")[0]
         return MinecraftLog(entry.name, entryContent, creationTime)
     }
@@ -68,7 +76,7 @@ object InputFileUtils {
     // unzips gzip files (log.gz files)
     private fun File.gunzip(charset: Charset): MinecraftLog {
         val gzipFileBytes = GZIPInputStream(this.inputStream()).readAllBytes()
-        val gzipFileContent = String(gzipFileBytes, charset).split("\n").toHashSet()
+        val gzipFileContent = String(gzipFileBytes, charset).split("\n")
         return MinecraftLog(this.name, gzipFileContent, this.creationTimeFromAttr())
     }
 }

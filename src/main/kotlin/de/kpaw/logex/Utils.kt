@@ -12,6 +12,8 @@ import java.util.zip.ZipFile
 const val messageDelimiter = ">"
 const val hgLaborStartDate = "2020-01-01-1"
 
+val defaultCharset: Charset = StandardCharsets.UTF_8
+
 val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
 val hgLaborDomains = arrayListOf("hglabor", "pvplabor")
 
@@ -20,14 +22,6 @@ val blacklistedNames = arrayListOf(
     "duels", "uhc", "gewinner", "verlierer", "woodcutting", "knockout",
     "thearchon", "potato", "admin", "spieler", "fisch", "console", "skyblock"
 )
-
-data class MinecraftLog(
-    val name: String,
-    val content: HashSet<String>,
-    val creationDateFromAttributes: String
-) {
-    val creationDateFromName: String = name.split("-").dropLast(1).joinToString("-")
-}
 
 object TerminalMessages {
     fun noFilesFound(path: String) {

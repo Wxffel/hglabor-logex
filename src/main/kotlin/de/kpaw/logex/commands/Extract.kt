@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 
 object Extract : CliktCommand(
@@ -36,10 +37,11 @@ object Extract : CliktCommand(
         help = "Only extracts files after the start date (yyyy-mm-dd)"
     ).default(hgLaborStartDate)
 
+    // changing charset is not yet supported
     private val charset by option(
         "-cs", "--charset",
-        help = "Specifies the charset which will be used to read the files"
-    ).default("UTF_8")
+        help = "Specifies the charset which will be used to read the files [NOT YET SUPPORTED]"
+    ).default("UTF_8") // alternative: ISO_8859_1
 
     override fun run() = extract()
 
@@ -52,13 +54,12 @@ object Extract : CliktCommand(
         terminal.println(TextColors.brightMagenta("inputPath=$inputPath/"))
         terminal.println(TextColors.brightMagenta("outputPath=$outputPath/"))
 
-        val vanillaInputFiles = InputFileUtils.inputFilesToMinecraftLogs("$inputPath/", startDate, charset.toCharset())
+        val vanillaInputFiles = InputFileUtils.inputFilesToMinecraftLogs("$inputPath/", startDate)
         val blcInputFiles: List<MinecraftLog> =
             if (pathContent.contains("blclient"))
                 InputFileUtils.inputFilesToMinecraftLogs(
                     "$inputPath/blclient/minecraft/",
-                    startDate,
-                    charset.toCharset()
+                    startDate
                 )
             else listOf()
 
@@ -100,6 +101,9 @@ object Extract : CliktCommand(
 
                         var chatMessage =
                             message.drop(9) // get rid of ": [CHAT] " now there is only the message content
+
+                        // used for charset debugging lol
+                        // terminal.println(TextColors.white(chatMessage))
 
                         if (chatMessage.isHGLaborPrivateMessage()) continue
 
