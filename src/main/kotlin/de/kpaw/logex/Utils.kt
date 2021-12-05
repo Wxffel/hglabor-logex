@@ -1,14 +1,38 @@
 package de.kpaw.logex
 
+import com.github.ajalt.mordant.rendering.TextColors
 import java.io.File
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.zip.GZIPInputStream
+import java.util.zip.ZipFile
 
-const val formattedMessageDelimiter = ">"
-const val hgLaborStartDate = "2020"
+const val messageDelimiter = ">"
+const val hgLaborStartDate = "2020-01-01-1"
 
-data class SurvivalMessageHolder(val fileName: String) {
-    val connectionMessages = mutableSetOf<String>()
-    val survivalMessages = mutableSetOf<String>()
+val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
+val hgLaborDomains = arrayListOf("hglabor", "pvplabor")
+
+// these are "names" used by gamemodes and more
+val blacklistedNames = arrayListOf(
+    "duels", "uhc", "gewinner", "verlierer", "woodcutting", "knockout",
+    "thearchon", "potato", "admin", "spieler", "fisch", "console", "skyblock"
+)
+
+data class MinecraftLog(
+    val name: String,
+    val content: HashSet<String>,
+    val creationDateFromAttributes: String
+) {
+    val creationDateFromName: String = name.split("-").dropLast(1).joinToString("-")
+}
+
+object TerminalMessages {
+    fun noFilesFound(path: String) {
+        terminal.println(TextColors.brightRed("ERROR: There are no files in directory $path"))
+    }
 }
 
 object Utils {
@@ -46,7 +70,7 @@ object Utils {
         }
     }
 
-    fun awaitConfirmation(): Boolean {
+    private fun awaitConfirmation(): Boolean {
         print(" (yes / no) ")
         var sure: Boolean? = null
         while (sure == null) {
@@ -61,116 +85,13 @@ object Utils {
         }
         return sure
     }
-
-    fun awaitContinueAnyways(): Boolean {
-        print("Do you want to continue anyways?")
-        return awaitConfirmation()
-    }
 }
 
-// LOG PATTERNS:
+fun String.toCharset(): Charset = Charset.forName(this)
 
-// Vanilla [23:36:11] [main/INFO]: [CHAT] <msg>
-// BLC     [11:07:24] [Client thread/INFO]: [CHAT] <msg>
-// IDK     [26Jun2021 18:22:21.883] [Render thread/INFO] [net.minecraft.client.gui.NewChatGui/]: [CHAT] <msg>
-//         [29Jun2021 21:10:20.240] [Render thread/INFO] [net.minecraft.client.gui.screen.ConnectingScreen/]: Connecting..
-
-// MINECRAFT HGLABOR PATTERNS:
-
-// $minecraftName » (.*)
-// $minecraftName ? (.*)
-// ? $minecraftName » (.*)
-// ? $minecraftName ? (.*)
-// ? (ffa) $minecraftName » (.*)
-// $minecraftName ? to you ?  (.*)
-// you to ? $minecraftName ?  (.*)
-// You -> $minecraftName: (.*)
-// $minecraftName -> You: (.*)
-// MSG ? $minecraftName ? $minecraftName ?  (.*)
-// ? $minecraftName ? $minecraftName ?  (.*)
-// <$minecraftName> (.*) // Note: EXTRACT THIS ONLY ON HGLABOR
-
-// UTILS
-// Wenn Charset falsch eingestellt, dann alles rip
-val isoCharset: Charset = Charset.forName("ISO8859-1")
-
-val minecraftNameRegex = Regex("\\w{3,16}")
-fun String.isValidMinecraftName(): Boolean = this.matches(minecraftNameRegex)
-
-val survivalMsgPattern = Regex("<$minecraftNameRegex> (.*)")
-fun String.isSurvivalMessage(): Boolean = survivalMsgPattern.matches(this)
-
-val msgRegexs = arrayListOf(
-    Regex("\\? you to \\? $minecraftNameRegex \\?  (.*)"),
-    Regex("$minecraftNameRegex \\? to you \\?  (.*)"),
-    Regex("\\? $minecraftNameRegex \\? $minecraftNameRegex \\?  (.*)"),
-    Regex("MSG \\? $minecraftNameRegex \\? $minecraftNameRegex \\?  (.*)"),
-    Regex("\\? $minecraftNameRegex \\? to you \\?  (.*)")
-)
-
-fun String.isHGLaborPrivateMessage(): Boolean {
-    msgRegexs.forEach { if (it.matches(this)) return true }
-    return false
+fun String.isCreationDateFromAttrNeeded() = when {
+    this.contains("debug") -> true
+    this == "debug" -> true
+    this == "latest" -> true
+    else -> false
 }
-
-fun String.isHGLaborPublicMessage(): Boolean {
-    val splitMessage = this.split(" ", limit = 6)
-
-    var name = splitMessage.getOrNull(0) ?: return false
-    val delimiter = splitMessage.getOrNull(1) ?: return false
-
-    if (name.startsWith("."))
-        name = name.drop(1) // dot "." could be hglabor bedrock marker
-
-    if ((delimiter == "?" || delimiter == "»") && name.isValidMinecraftName() && !name.isBlacklistedName())
-        return true
-
-    return false
-}
-
-val blacklistedNames = arrayListOf(
-    "duels", "uhc", "gewinner", "verlierer", "woodcutting", "knockout",
-    "thearchon", "potato", "admin", "spieler", "fisch", "console", "skyblock"
-)
-
-fun String.isBlacklistedName(): Boolean = blacklistedNames.contains(this.lowercase())
-
-fun String.conditioning(): String {
-    var message = this
-    if (message.startsWith("? ")) message = message.drop(2)
-    // now they are modified to:
-    // $minecraftName » (.*)
-    // $minecraftName ? (.*)
-    // (ffa) $minecraftName » (.*)
-
-    // "(ffa) $minecraftName » (.*)" gets edited to "$minecraftName » (.*)"
-    if (message.firstOrNull() == '(')
-        message = message.substring(message.indexOf(" ") + 1)
-
-    return message
-}
-
-fun extractHGLaborSurvivalMessages(survivalMessageFiles: MutableMap<String, SurvivalMessageHolder>): MutableSet<String> {
-    val connectionAndSurvivalMessages = mutableSetOf<String>()
-    val hgLaborSurvivalMessages = mutableSetOf<String>()
-
-    survivalMessageFiles.forEach { (_, survivalMessageHolder) ->
-        survivalMessageHolder.survivalMessages.forEach { connectionAndSurvivalMessages.add(it) }
-        survivalMessageHolder.connectionMessages.forEach { connectionAndSurvivalMessages.add(it) }
-    }
-
-    // Extracts ONLY messages send on a specific server (ip)
-    var lastHostWasHGLabor = false
-    connectionAndSurvivalMessages.toSortedSet().forEach {
-        val messageSplit = it.split(" ")
-        val nameOrIP = messageSplit[2]
-        if (nameOrIP[0] != '<')
-            lastHostWasHGLabor = nameOrIP.isHGLaborIP() // || nameOrIP.lowercase().contains("axay")
-        else if (lastHostWasHGLabor) hgLaborSurvivalMessages.add(it)
-    }
-    println("\nHGLabor Survival Messages: ${hgLaborSurvivalMessages.size}")
-    return hgLaborSurvivalMessages
-}
-
-val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
-fun String.isHGLaborIP(): Boolean = this.lowercase().contains("hglabor") || hgLaborIPs.contains(this)

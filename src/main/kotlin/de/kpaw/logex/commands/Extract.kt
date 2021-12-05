@@ -6,27 +6,25 @@ import com.github.ajalt.clikt.parameters.arguments.default
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
+import com.github.ajalt.mordant.rendering.TextColors
 import de.kpaw.logex.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
-import java.nio.file.Files
+import java.nio.charset.Charset
 import java.nio.file.Path
-import java.nio.file.attribute.BasicFileAttributes
-import java.util.zip.ZipFile
-import kotlin.system.measureTimeMillis
 
 object Extract : CliktCommand(
     help = "Extracts specified lines of files"
 ) {
     private val inputPath by argument(help = "The path of the folder to extract lines from").path(
         mustExist = true, canBeFile = false
-    ).default(Path.of("${System.getProperty("user.home")}\\AppData\\Roaming\\.minecraft\\logs")) // trash
+    )
 
     private val outputPath by argument(help = "The path where to put the output file").path(
         mustExist = true, canBeFile = false
-    ).default(Path.of("${System.getProperty("user.home")}\\Desktop\\")) // trash
+    )
 
     private val outputFileName by option(
         "-of", "--outputfilename",
@@ -35,168 +33,96 @@ object Extract : CliktCommand(
 
     private val startDate by option(
         "-sd", "--startdate",
-        help = "Only extracts files after the start date"
+        help = "Only extracts files after the start date (yyyy-mm-dd)"
     ).default(hgLaborStartDate)
+
+    private val charset by option(
+        "-cs", "--charset",
+        help = "Specifies the charset which will be used to read the files"
+    ).default("UTF_8")
 
     override fun run() = extract()
 
     private fun extract() {
-        val filenames = File("$inputPath/").list() ?: kotlin.run {
-            println("Error! There are no files in $inputPath/")
+        val pathContent = File("$inputPath/").list() ?: kotlin.run {
+            TerminalMessages.noFilesFound("$inputPath/")
             return
         }
 
-        println("outputPath=$outputPath")
-        println("inputPath=$inputPath")
+        terminal.println(TextColors.brightMagenta("inputPath=$inputPath/"))
+        terminal.println(TextColors.brightMagenta("outputPath=$outputPath/"))
 
-        val inputFiles = (filenames as Array<*>).map { File("$inputPath/$it") }
-            .filter { it.isFile }.toMutableList()
+        val vanillaInputFiles = InputFileUtils.inputFilesToMinecraftLogs("$inputPath/", startDate, charset.toCharset())
+        val blcInputFiles: List<MinecraftLog> =
+            if (pathContent.contains("blclient"))
+                InputFileUtils.inputFilesToMinecraftLogs(
+                    "$inputPath/blclient/minecraft/",
+                    startDate,
+                    charset.toCharset()
+                )
+            else listOf()
 
-        val inputZips = (filenames as Array<*>).filter {
-            (it as String).endsWith(".zip") ||
-                    (it as String).endsWith(".gz")
-        }
-            .map { ZipFile("$inputPath/$it") }.toMutableList()
+        terminal.println(TextColors.brightYellow("Found ${vanillaInputFiles.size} vanilla files"))
+        terminal.println(TextColors.brightYellow("Found ${blcInputFiles.size} blc files"))
 
-        inputZips.forEach { zipFile ->
-            val entry = zipFile.entries().toList().first()
-            zipFile.getInputStream(entry).use { input ->
-                val file = File(entry.name)
-                file.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-                inputFiles.add(file)
-            }
-        }
+        val messageHolder = hashSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
+        var processedFiles = 0
 
-        // Adding blc logs to vanilla logs (inputfiles)
-        if (filenames.contains("blclient")) {
-            val blcFilePath = "$inputPath/blclient/minecraft/"
-            val blcFileNames = File(blcFilePath).list() ?:
-            println("No files in $inputPath/blclient/minecraft/ were found")
-            val blcInputFiles = (blcFileNames as Array<*>).map { File("$blcFilePath$it") }
-                .filter { file -> file.isFile }
+        runBlocking(Dispatchers.IO) {
+            for (minecraftLog in vanillaInputFiles) {
+                launch {
+                    processedFiles++
+                    val date = if (minecraftLog.name.isCreationDateFromAttrNeeded())
+                        minecraftLog.creationDateFromAttributes
+                    else minecraftLog.creationDateFromName
 
-            inputFiles.addAll(blcInputFiles)
-        }
+                    for (line in minecraftLog.content) {
+                        if (line.isBlank() || line.length < 24) continue
 
-        val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
+                        val time = LogExRegex.timePattern.find(line)?.value
 
-        val messageHolder = hashSetOf<String>()
-        val survivalMessageFiles = mutableMapOf<String, SurvivalMessageHolder>()
+                        // the 21st char in the vanilla log is (in case of a chat message) the ':'
+                        val message = LogExRegex.messagePattern.find(line, startIndex = 21)?.value
 
-        val timeToTake = measureTimeMillis {
-
-            runBlocking(Dispatchers.IO) {
-                inputFiles.forEach { file ->
-                    launch {
-                        val cleanFileName = file.nameWithoutExtension
-                        if (cleanFileName.split("-")[0] < startDate) return@launch
-
-                        var date = cleanFileName.split("-").dropLast(1).joinToString("-")
-
-                        if (cleanFileName.contains("debug") || cleanFileName == "debug") {
-                            val attr = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java)
-                            date = attr.creationTime().toString().split("T")[0]
+                        // connecting-messages
+                        if (message == null) {
+                            // the 23st char in the vanilla log is (in case of a connecting message) the 'C'
+                            // e.g. [12:07:12] [main/INFO]: Connecting to tcpshield.hglabor.de., 25565
+                            // continue if null -> not a chat message nor a connecting message
+                            val connectingMessage = LogExRegex.connectingPattern
+                                .find(line, startIndex = 23)?.value ?: continue
+                            // Connecting to server.hglabor.de., 25751
+                            var serverIP = connectingMessage.substring(14)
+                            if (serverIP.endsWith('.')) serverIP = serverIP.dropLast(1)
+                            messageHolder.add("$date $time $serverIP" to false)
+                            continue
                         }
 
-                        file.forEachLine(isoCharset) { line ->
-                            if (line.isBlank() || line.length < 24) return@forEachLine
+                        var chatMessage =
+                            message.drop(9) // get rid of ": [CHAT] " now there is only the message content
 
-                            val vanillaSubstring = line.substring(24)
-                            val blcSubstring: String? = if (line.length >= 33) line.substring(33) else null
-                            val optifineString: String? =
-                                // [26Jun2021 18:22:21.883] [Render thread/INFO] [net.minecraft.client.gui.NewChatGui/]: [CHAT] <msg>
-                                if (line.length >= 46) {
-                                    line.substring(46).split(" ")
-                                        .drop(1).joinToString(" ")
-                                } else null
+                        if (chatMessage.isHGLaborPrivateMessage()) continue
 
-                            var time = line.substring(1, 9)
+                        chatMessage = chatMessage.conditioning()
 
-                            var chatMessage: String? = when {
-                                vanillaSubstring.startsWith("[CHAT]") -> vanillaSubstring
-                                blcSubstring?.startsWith("[CHAT]") == true -> blcSubstring
-                                else -> null
-                            }
-
-                            if (chatMessage == null) {
-                                if (optifineString?.startsWith("[CHAT]") == true) {
-                                    chatMessage = optifineString
-
-                                    if (line.indexOfFirst { it == '.' } > 0) {
-
-                                        try {
-                                            time = line.substring(
-                                                line.indexOfFirst { it == ' ' } + 1,
-                                                line.indexOfFirst { it == '.' }
-                                            )
-                                        } catch (e: Exception) {
-                                            println(e)
-                                            println("Line \"$line\" in log \"${file.name}\"")
-                                        }
-
-                                    } else println("Line \"$line\" in log named \"${file.name}\" seems unhandled.")
-                                }
-                            }
-
-                            // connecting-messages
-                            if (chatMessage == null) {
-
-                                var connectingMessage: String? = when {
-                                    vanillaSubstring.startsWith("Connecting") -> vanillaSubstring
-                                    blcSubstring?.startsWith("Connecting") == true -> blcSubstring
-                                    else -> null
-                                }
-
-                                if (connectingMessage == null) {
-                                    // Optifine check
-                                    if (optifineString?.startsWith("Connecting") == true)
-                                        connectingMessage = optifineString
-                                    else return@forEachLine
-                                }
-
-                                // Connecting to server.hglabor.de., 25751
-                                var serverIP = connectingMessage.substring(14, connectingMessage.indexOf(','))
-                                if (serverIP.endsWith('.')) serverIP = serverIP.dropLast(1)
-
-                                survivalMessageFiles.putIfAbsent(cleanFileName, SurvivalMessageHolder(cleanFileName))
-                                survivalMessageFiles[cleanFileName]?.connectionMessages?.add("$date $time $serverIP")
-                                return@forEachLine
-                            }
-
-                            chatMessage = chatMessage.drop(7) // get rid of "[CHAT]" + a whitespace
-
-                            if (chatMessage.isHGLaborPrivateMessage()) return@forEachLine
-
-                            chatMessage = chatMessage.conditioning()
-
-                            // skip this weird playerlist thing on this guild server
-                            if (chatMessage.endsWith("?  ")) return@forEachLine
-
-                            if (chatMessage.isHGLaborPublicMessage()) {
-                                val index = chatMessage.indexOf(' ') + 1
-                                chatMessage = chatMessage.replaceRange(index..index, formattedMessageDelimiter)
-                                messageHolder.add("$date $time $chatMessage")
-                            } else if (chatMessage.isSurvivalMessage()) {
-                                survivalMessageFiles.putIfAbsent(cleanFileName, SurvivalMessageHolder(cleanFileName))
-                                survivalMessageFiles[cleanFileName]?.survivalMessages?.add("$date $time $chatMessage")
-                            }
+                        if (chatMessage.isPossiblyHGLaborPublicMessage()) {
+                            // replaces "?" or "»" with the formattedMessageDelimiter ">"
+                            val index = chatMessage.indexOf(' ') + 1
+                            chatMessage = chatMessage.replaceRange(index..index, messageDelimiter)
+                            messageHolder.add("$date $time $chatMessage" to true)
+                        } else if (chatMessage.isSurvivalMessage()) {
+                            // replaces "<" and ">" before and after the minecraft name, also a delimiter is added
+                            chatMessage = chatMessage.replaceFirst("<", "")
+                                .replaceFirst(">", " $messageDelimiter")
+                            messageHolder.add("$date $time $chatMessage" to true)
                         }
                     }
                 }
             }
-
-            val hgLaborSurvivalMessages = extractHGLaborSurvivalMessages(survivalMessageFiles)
-            hgLaborSurvivalMessages.forEach {
-                val formattedMessage = it.replaceFirst("<", "")
-                    .replaceFirst(">", " $formattedMessageDelimiter")
-
-                messageHolder.add(formattedMessage)
-            }
-
-            messageHolder.toSortedSet().forEach { outputFile.appendText(it + "\n") }
         }
-        println("Extracting took $timeToTake ms")
+        val hgLaborChatMessages = messageHolder.extractHGLaborSurvivalMessages()
+        val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
+        hgLaborChatMessages.toSortedSet().forEach { outputFile.appendText(it + "\n") }
+        terminal.println(TextColors.brightMagenta("Processed $processedFiles files"))
     }
 }

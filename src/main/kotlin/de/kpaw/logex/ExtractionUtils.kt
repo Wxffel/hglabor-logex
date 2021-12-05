@@ -1,4 +1,4 @@
-package de.kpaw.logex.commands
+package de.kpaw.logex
 
 import com.github.ajalt.mordant.rendering.TextColors
 import de.kpaw.logex.blacklistedNames
