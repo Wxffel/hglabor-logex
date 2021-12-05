@@ -165,7 +165,7 @@ fun extractHGLaborSurvivalMessages(survivalMessageFiles: MutableMap<String, Surv
         val messageSplit = it.split(" ")
         val nameOrIP = messageSplit[2]
         if (nameOrIP[0] != '<')
-            lastHostWasHGLabor = nameOrIP.isHGLaborIP() || nameOrIP.lowercase().contains("axay")
+            lastHostWasHGLabor = nameOrIP.isHGLaborIP() // || nameOrIP.lowercase().contains("axay")
         else if (lastHostWasHGLabor) hgLaborSurvivalMessages.add(it)
     }
     println("\nHGLabor Survival Messages: ${hgLaborSurvivalMessages.size}")
