@@ -19,7 +19,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2-native-mt")
 
     implementation("com.github.ajalt.clikt:clikt:3.3.0")
-    //implementation("com.github.ajalt.mordant:mordant:2.0.0-beta3")
+    // implementation("com.github.ajalt.mordant:mordant:2.0.0-beta3")
 }
 
 application {
