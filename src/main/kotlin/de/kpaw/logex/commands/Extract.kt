@@ -65,11 +65,11 @@ object Extract : CliktCommand(
 
         terminal.println(TextColors.brightCyan("${tooOld.size} files and ${tooOldBLC.size} BLC files were too old (before $startDate)"))
 
-        val messageHolder = hashSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
+        val messageHolder = mutableSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
         var processedFiles = 0
 
         runBlocking(Dispatchers.IO) {
-            val inputStringsChunked = inputStrings.chunked(200)
+/*            val inputStringsChunked = inputStrings.chunked(200)
             val blcStringChunked = blcStrings.chunked(200)
 
             // extracting inputStrings
@@ -87,10 +87,30 @@ object Extract : CliktCommand(
                         }
                     }.join()  // wait until the inner for loop is finished
                 }
+            }*/
+
+            for (fileName in inputStrings) {
+                launch {
+                    val filePath = "$inputPath/$fileName"
+                    val messages = filePath.extractFromPath(fileName)
+                    if (messages != null)
+                        messageHolder.addAll(messages)
+                    processedFiles++
+                }
             }
 
+/*            for (fileName in blcStrings) {
+                launch {
+                    val filePath = "$inputPath$blcPath/$fileName"
+                    val messages = filePath.extractFromPath(fileName)
+                    if (messages != null)
+                        messageHolder.addAll(messages)
+                    processedFiles++
+                }
+            }*/
+
             // extracting blcStrings
-            launch {
+/*            launch {
                 for (inputStringChunk in blcStringChunked) {
                     launch {
                         for (fileName in inputStringChunk) {
@@ -104,11 +124,33 @@ object Extract : CliktCommand(
                         }
                     }.join()  // wait until the inner for loop is finished
                 }
-            }
+            }*/
         }
+
         terminal.println(TextColors.brightMagenta("Processed $processedFiles files"))
-        val hgLaborChatMessages = messageHolder.extractHGLaborMessages()
-        val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
-        hgLaborChatMessages.toSortedSet().forEach { outputFile.appendText(it + "\n") }
+        //val hgLaborChatMessages = messageHolder.extractHGLaborMessages()
+        //val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
+        //hgLaborChatMessages.toSortedSet().forEach { outputFile.appendText(it + "\n") }
+
+        val notNullList = mutableListOf<Pair<String, Boolean>>()
+        val nullList = mutableListOf<Pair<String, Boolean>>()
+
+        for (pair in messageHolder) {
+            if (pair != null) {
+                if (pair.first != null && pair.second != null) {
+                    notNullList.add(pair)
+                } else nullList.add(pair)
+            } else nullList.add(pair)
+        }
+
+        val notNullListSorted = notNullList.sortedBy { it.first }
+
+        val sorted = messageHolder.sortedBy { it.first }
+        terminal.println(TextColors.cyan("sorted=${sorted.size}"))
+
+        terminal.println(TextColors.brightRed("messageHolderSize=${messageHolder.size}"))
+        terminal.println(TextColors.brightRed("messageHolderNotNullSize=${notNullList.size}"))
+        terminal.println(TextColors.brightRed("messageHolderNotNullSortedSize=${notNullListSorted.size}"))
+        terminal.println(TextColors.brightRed("messageHolderNullList=${nullList.size}"))
     }
 }

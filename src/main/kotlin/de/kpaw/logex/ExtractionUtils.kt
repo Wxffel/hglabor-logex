@@ -20,7 +20,7 @@ const val blcPath = "/blclient/minecraft/"
 
 val defaultCharset: Charset = StandardCharsets.ISO_8859_1
 
-val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
+val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248") // 2020-03-01 16:44:41 178.32.80.96 NULL
 val hgLaborDomains = arrayListOf("hglabor", "pvplabor")
 
 // these are "names" used by gamemodes and more
@@ -29,80 +29,13 @@ val blacklistedNames = arrayListOf(
     "thearchon", "potato", "admin", "spieler", "fisch", "console", "skyblock"
 )
 
-// LOG PATTERNS:
-
-// DEF: Default, Vanilla
-// BLC: Badlion Client
-// IDK: Possibly Optifine
-
-// DEF  [23:36:11] [main/INFO]: [CHAT] <msg>
-// BLC  [11:07:24] [Client thread/INFO]: [CHAT] <msg>
-// IDK  [26Jun2021 18:22:21.883] [Render thread/INFO] [net.minecraft.client.gui.NewChatGui/]: [CHAT] <msg>
-
-// DEF  [12:07:12] [main/INFO]: Connecting to tcpshield.hglabor.de., 25565
-// IDK  [29Jun2021 21:10:20.240] [Render thread/INFO] [net.minecraft.client.gui.screen.ConnectingScreen/]: Connecting to hgbuild.gq, 25565
-// BLC  [15:59:15] [Render thread/INFO]: Connecting to hgbuild.gq, 25565 // these are attempts
-// BLC  [15:59:17] [Render thread/INFO]: Worker done, connecting to hgbuild.gq, 25565 // this is the final connection
-// BLC  [10:43:08] [Client thread/INFO]: Connecting to mc.hypixel.net, 25565
-
-// MINECRAFT HGLABOR PATTERNS:
-// Public:
-// $minecraftName » (.*)
-// $minecraftName ? (.*)
-// ? $minecraftName » (.*)
-// ? $minecraftName ? (.*)
-// ? (ffa) $minecraftName » (.*)
-
-// Msg:
-// $minecraftName ? to you ?  (.*)
-// you to ? $minecraftName ?  (.*)
-// You -> $minecraftName: (.*)
-// $minecraftName -> You: (.*)
-// MSG ? $minecraftName ? $minecraftName ?  (.*)
-// ? $minecraftName ? $minecraftName ?  (.*)
-
-// Vanilla Survival
-// <$minecraftName> (.*)
-
-object LogExRegex {
-    val minecraftNamePattern = Regex("\\w{3,16}")
-    val timePattern = Regex("""([012]\d:[0-5]\d:[0-5]\d)""")
-    val messagePattern = Regex(""": \[CHAT] (.*)""")
-    val connectingPattern = Regex("""(?i)connecting to [\w\d.]*""")
-    val survivalMsgPattern = Regex("<$minecraftNamePattern> (.*)")
-    val msgRegexes = arrayListOf(
-        Regex("\\? you to \\? $minecraftNamePattern \\?  (.*)"),
-        Regex("$minecraftNamePattern \\? to you \\?  (.*)"),
-        Regex("\\? $minecraftNamePattern \\? $minecraftNamePattern \\?  (.*)"),
-        Regex("MSG \\? $minecraftNamePattern \\? $minecraftNamePattern \\?  (.*)"),
-        Regex("\\? $minecraftNamePattern \\? to you \\?  (.*)")
-    )
-}
-
 fun String.isBlacklistedName() = blacklistedNames.contains(this.lowercase())
-
-fun String.isValidMinecraftName() = this.matches(LogExRegex.minecraftNamePattern)
 
 fun String.isHGLaborIP() = hgLaborDomains.any { this.lowercase().contains(it) } || hgLaborIPs.contains(this)
 
-fun String.isSurvivalMessage() = LogExRegex.survivalMsgPattern.matches(this)
+fun String.isSurvivalMessage() = LogExPatterns.vanillaChatMessage.matches(this)
 
-fun String.isHGLaborPrivateMessage() = LogExRegex.msgRegexes.any { it.matches(this) }
-
-fun String.isPossiblyHGLaborPublicMessage(): Boolean {
-    val splitMessage = this.split(" ", limit = 3)
-
-    var name = splitMessage.getOrNull(0) ?: return false
-    val delimiter = splitMessage.getOrNull(1) ?: return false
-
-    if (name.startsWith("."))
-        name = name.drop(1) // dot "." could be hglabor bedrock marker
-
-    if ((delimiter == "?" || delimiter == "»") && name.isValidMinecraftName() && !name.isBlacklistedName())
-        return true
-
-    return false
-}
+fun String.isHGLaborPrivateMessage() = LogExPatterns.privateChatMessage.matches(this)
 
 // $minecraftName » (.*)
 // $minecraftName ? (.*)
@@ -110,15 +43,16 @@ fun String.isPossiblyHGLaborPublicMessage(): Boolean {
 // ? $minecraftName ? (.*)
 // ? (ffa) $minecraftName » (.*)
 fun String.conditioning(): String {
-    var message = this
+    var message = this.drop(9) // get rid of ": [CHAT] " now there is only the message content
     if (message.startsWith("? ")) message = message.drop(2)
+
     // now they are modified to:
     // $minecraftName » (.*)
     // $minecraftName ? (.*)
     // (ffa) $minecraftName » (.*)
 
     // "(ffa) $minecraftName » (.*)" gets possibly edited to "$minecraftName » (.*)"
-    if (message.firstOrNull() == '(') message = message.substring(message.indexOf(" "))
+    if (message.firstOrNull() == '(') message = message.substring(message.indexOf(" ") + 1)
 
     // $minecraftName » (.*)
     // $minecraftName ? (.*)
@@ -134,13 +68,36 @@ fun String.conditioning(): String {
 fun HashSet<Pair<String, Boolean>>.extractHGLaborMessages(): MutableSet<String> {
     val hgLaborChatMessages = mutableSetOf<String>()
     var lastHostWasHGLabor = false
-    this.toSortedSet(compareBy { it.first }).forEach {
-        val messageSplit = it.first.split(" ", limit = 4)
-        val nameOrIP = messageSplit[2]
 
-        if (!nameOrIP.isValidMinecraftName()) // is not a valid minecraft name
-            lastHostWasHGLabor = nameOrIP.isHGLaborIP() // so it could be (must be) an ip address
-        else if (lastHostWasHGLabor) hgLaborChatMessages.add(it.first)
+    val sortedSet = this.toSortedSet(compareBy { it.first })
+
+    val notNull = this.filter { true }
+    val sorted = notNull.sortedBy { it.first }
+
+    println("original size=" + this.size)
+    println("notNull size=" + notNull.size)
+    println("sorted set size=" + sortedSet.size)
+    println("sorted list size=" + sorted.size)
+
+    // 2020-05-13 19:20:30 mc.hypixel.net isHGLaborIP=false
+
+    for (pair in sorted) {
+
+        if (!pair.second) { // connecting message
+            val serverIP = pair.first.split(" ").getOrNull(2)
+
+            if (serverIP != null) {
+                lastHostWasHGLabor = serverIP.isHGLaborIP()
+                hgLaborChatMessages.add("${pair.first} isHGLaborIP=$lastHostWasHGLabor")
+                continue
+            } else {
+                hgLaborChatMessages.add("${pair.first} NULL")
+                continue
+            }
+        }
+
+        // val playerName = it.first.split(" ", limit = 4)[2]
+        hgLaborChatMessages.add("${pair.first} onLabor=$lastHostWasHGLabor")
     }
     terminal.println(TextColors.brightGreen("\nExtracted HGLabor Messages: ${hgLaborChatMessages.size}"))
     return hgLaborChatMessages
@@ -157,11 +114,7 @@ fun String.extractFromPath(fileName: String): MutableSet<Pair<String, Boolean>>?
     val file = File(this)
     return when (file.extension) {
         // zip file
-        "zip" -> {
-            val messages = ZipFile(this).extractZipFile()
-            println(messages.firstOrNull().toString())
-            messages
-        }
+        "zip" -> ZipFile(this).extractZipFile()
         // gzip file
         "gz" -> file.extractGZipFile()
         // file
@@ -231,47 +184,56 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
  * messages from a buffered reader
  */
 
-private fun String.extract(date: String): Pair<String, Boolean>? {
+/*private fun String.extract(date: String): Pair<String, Boolean>? {
     if (this.isBlank() || this.length < 24) return null
 
-    val time = LogExRegex.timePattern.find(this)?.value
-    val message = LogExRegex.messagePattern.find(this)?.value
+    val time = LogExPatterns.time.find(this)?.value
+    val message = LogExPatterns.hgLaborChatMessage.find(this)?.value
 
     // connecting-messages
     if (message == null) {
-        // e.g. [12:07:12] [main/INFO]: Connecting to tcpshield.hglabor.de., 25565
-        // if null -> not a chat message nor a connecting message -> continue
-        val connectingMessage = LogExRegex.connectingPattern
+        val connectingMessage = LogExPatterns.connecting
             .find(this)?.value ?: return null
-        // Connecting to server.hglabor.de., 25751
-        var serverIP = connectingMessage.substring(14)
+        // : Connecting to server.hglabor.de.
+        var serverIP = connectingMessage.substring(16)
         if (serverIP.endsWith('.'))
             serverIP = serverIP.dropLast(1)
 
         return "$date $time $serverIP" to false
     }
 
-    var chatMessage =
-        message.drop(9) // get rid of ": [CHAT] " now there is only the message content
+    var chatMessage = message.conditioning()
 
-    // used for charset debugging lol
-    // terminal.println(TextColors.white(chatMessage))
+    if (message.isHGLaborPrivateMessage()) {
+        return "$date $time $chatMessage MSG" to true
+    }
 
-    if (chatMessage.isHGLaborPrivateMessage()) return null
-
-    chatMessage = chatMessage.conditioning()
-
-    if (chatMessage.isPossiblyHGLaborPublicMessage()) {
-        // replaces "?" or "»" with the formattedMessageDelimiter ">"
-        val index = chatMessage.indexOf(' ') + 1
-        chatMessage = chatMessage.replaceRange(index..index, messageDelimiter)
-        return "$date $time $chatMessage" to true
-    } else if (chatMessage.isSurvivalMessage()) {
+    if (chatMessage.isSurvivalMessage()) {
         // replaces "<" and ">" before and after the minecraft name, also a delimiter is added
+        // todo: to conditioning/extract HGLabor messages
         chatMessage = chatMessage.replaceFirst("<", "")
             .replaceFirst(">", " $messageDelimiter")
-
         return "$date $time $chatMessage" to true
     }
-    return null
+
+    // replaces "?" or "»" with the formattedMessageDelimiter ">"
+    val index = chatMessage.indexOf(' ') + 1
+    chatMessage = chatMessage.replaceRange(index..index, messageDelimiter)
+    // todo: to conditioning/extract HGLabor messages
+    return "$date $time $chatMessage" to true
+}*/
+
+private fun String.extract(date: String): Pair<String, Boolean> {
+    if (this.isBlank() || this.length < 24) return Pair("-1", false)
+
+    val time = LogExPatterns.time.find(this)?.value
+    val message = LogExPatterns.allChatMessages.find(this)?.value
+
+    // connecting-messages
+    if (message == null) {
+        val connectingMessage = LogExPatterns.connecting.find(this)?.value ?: return Pair("-1", false)
+        return "$date $time $connectingMessage" to false
+    }
+
+    return "$date $time $message" to true
 }
