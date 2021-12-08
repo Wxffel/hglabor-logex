@@ -9,11 +9,10 @@ object LogExPatterns {
     private val mcName = Regex("""(\w{3,16})""")
     val time = Regex("""([012]\d:[0-5]\d:[0-5]\d)""")
     val connecting = Regex(""": (?i)connecting to [a-zA-Z\d.-]*""")
+    val chatMessage = Regex(""": \[CHAT] (.*)""")
     val hgLaborChatMessage = Regex(""": \[CHAT] (\? )?(\(\w*\) )?(\.)?$mcName [»?] (.*)""")
     val privateChatMessage = Regex(""": \[CHAT] (MSG )?(\? )?$mcName \? ($mcName|(to you)) \?  (.*)""")
     val vanillaChatMessage = Regex(""": \[CHAT] <$mcName> (.*)""")
-
-    val allChatMessages = Regex(""": \[CHAT] (.*)""")
 }
 
 /**

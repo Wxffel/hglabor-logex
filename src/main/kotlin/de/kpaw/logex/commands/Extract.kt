@@ -10,7 +10,10 @@ import de.kpaw.logex.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 object Extract : CliktCommand(
     help = "Extracts specified lines of files"
@@ -44,6 +47,7 @@ object Extract : CliktCommand(
     private fun extract() {
         terminal.println(TextColors.brightMagenta("inputPath=$inputPath/"))
         terminal.println(TextColors.brightMagenta("outputPath=$outputPath/"))
+        terminal.println(TextColors.brightMagenta("outputFile=$outputFileName.txt"))
 
         val inputStrings = File("$inputPath/").pathContent() ?: return
         val blcStrings: MutableList<String> =
@@ -66,10 +70,11 @@ object Extract : CliktCommand(
         terminal.println(TextColors.brightCyan("${tooOld.size} files and ${tooOldBLC.size} BLC files were too old (before $startDate)"))
 
         val messageHolder = mutableSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
-        var processedFiles = 0
+        val processedFiles = AtomicInteger()
 
         runBlocking(Dispatchers.IO) {
-/*            val inputStringsChunked = inputStrings.chunked(200)
+            val mutex = Mutex() // thanks blue
+            val inputStringsChunked = inputStrings.chunked(200)
             val blcStringChunked = blcStrings.chunked(200)
 
             // extracting inputStrings
@@ -80,77 +85,46 @@ object Extract : CliktCommand(
                             launch {
                                 val filePath = "$inputPath/$fileName"
                                 val messages = filePath.extractFromPath(fileName)
-                                if (messages != null)
-                                    messageHolder.addAll(messages)
-                                processedFiles++
+                                if (messages != null) {
+                                    mutex.withLock {
+                                        messageHolder.addAll(messages)
+                                    }
+                                }
+                                processedFiles.incrementAndGet()
                             }
                         }
                     }.join()  // wait until the inner for loop is finished
                 }
-            }*/
-
-            for (fileName in inputStrings) {
-                launch {
-                    val filePath = "$inputPath/$fileName"
-                    val messages = filePath.extractFromPath(fileName)
-                    if (messages != null)
-                        messageHolder.addAll(messages)
-                    processedFiles++
-                }
             }
 
-/*            for (fileName in blcStrings) {
-                launch {
-                    val filePath = "$inputPath$blcPath/$fileName"
-                    val messages = filePath.extractFromPath(fileName)
-                    if (messages != null)
-                        messageHolder.addAll(messages)
-                    processedFiles++
-                }
-            }*/
-
             // extracting blcStrings
-/*            launch {
+            launch {
                 for (inputStringChunk in blcStringChunked) {
                     launch {
                         for (fileName in inputStringChunk) {
                             launch {
                                 val filePath = "$inputPath$blcPath/$fileName"
                                 val messages = filePath.extractFromPath(fileName)
-                                if (messages != null)
-                                    messageHolder.addAll(messages)
-                                processedFiles++
+                                if (messages != null) {
+                                    mutex.withLock {
+                                        messageHolder.addAll(messages)
+                                    }
+                                }
+                                processedFiles.incrementAndGet()
                             }
                         }
                     }.join()  // wait until the inner for loop is finished
                 }
-            }*/
+            }
         }
 
         terminal.println(TextColors.brightMagenta("Processed $processedFiles files"))
-        //val hgLaborChatMessages = messageHolder.extractHGLaborMessages()
-        //val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
-        //hgLaborChatMessages.toSortedSet().forEach { outputFile.appendText(it + "\n") }
+        terminal.println("messageHolderSize=${messageHolder.size}")
 
-        val notNullList = mutableListOf<Pair<String, Boolean>>()
-        val nullList = mutableListOf<Pair<String, Boolean>>()
-
-        for (pair in messageHolder) {
-            if (pair != null) {
-                if (pair.first != null && pair.second != null) {
-                    notNullList.add(pair)
-                } else nullList.add(pair)
-            } else nullList.add(pair)
+        val outputFile = Utils.createFile("$outputPath/", outputFileName) ?: return
+        val hgLaborChatMessages = messageHolder.extractHGLaborMessages()
+        for (pair in hgLaborChatMessages) {
+            outputFile.appendText("$pair\n")
         }
-
-        val notNullListSorted = notNullList.sortedBy { it.first }
-
-        val sorted = messageHolder.sortedBy { it.first }
-        terminal.println(TextColors.cyan("sorted=${sorted.size}"))
-
-        terminal.println(TextColors.brightRed("messageHolderSize=${messageHolder.size}"))
-        terminal.println(TextColors.brightRed("messageHolderNotNullSize=${notNullList.size}"))
-        terminal.println(TextColors.brightRed("messageHolderNotNullSortedSize=${notNullListSorted.size}"))
-        terminal.println(TextColors.brightRed("messageHolderNullList=${nullList.size}"))
     }
 }

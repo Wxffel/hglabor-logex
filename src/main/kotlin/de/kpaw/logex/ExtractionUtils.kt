@@ -43,8 +43,8 @@ fun String.isHGLaborPrivateMessage() = LogExPatterns.privateChatMessage.matches(
 // ? $minecraftName ? (.*)
 // ? (ffa) $minecraftName » (.*)
 fun String.conditioning(): String {
-    var message = this.drop(9) // get rid of ": [CHAT] " now there is only the message content
-    if (message.startsWith("? ")) message = message.drop(2)
+    var message = this
+    // if (message.startsWith("? ")) message = message.drop(2)
 
     // now they are modified to:
     // $minecraftName » (.*)
@@ -52,7 +52,7 @@ fun String.conditioning(): String {
     // (ffa) $minecraftName » (.*)
 
     // "(ffa) $minecraftName » (.*)" gets possibly edited to "$minecraftName » (.*)"
-    if (message.firstOrNull() == '(') message = message.substring(message.indexOf(" ") + 1)
+    // if (message.firstOrNull() == '(') message = message.substring(message.indexOf(" ") + 1)
 
     // $minecraftName » (.*)
     // $minecraftName ? (.*)
@@ -65,42 +65,22 @@ fun String.conditioning(): String {
  * here it returns messages sent on "hglabor" and its ips
  */
 
-fun HashSet<Pair<String, Boolean>>.extractHGLaborMessages(): MutableSet<String> {
-    val hgLaborChatMessages = mutableSetOf<String>()
+fun Collection<Pair<String, Boolean>>.extractHGLaborMessages(): MutableSet<String> {
+    val hgLaborMessages = mutableSetOf<String>()
+    val sortedSet = this.toSortedSet(compareBy { it.first })
     var lastHostWasHGLabor = false
 
-    val sortedSet = this.toSortedSet(compareBy { it.first })
-
-    val notNull = this.filter { true }
-    val sorted = notNull.sortedBy { it.first }
-
-    println("original size=" + this.size)
-    println("notNull size=" + notNull.size)
-    println("sorted set size=" + sortedSet.size)
-    println("sorted list size=" + sorted.size)
-
-    // 2020-05-13 19:20:30 mc.hypixel.net isHGLaborIP=false
-
-    for (pair in sorted) {
-
+    for (pair in sortedSet) {
         if (!pair.second) { // connecting message
-            val serverIP = pair.first.split(" ").getOrNull(2)
-
-            if (serverIP != null) {
-                lastHostWasHGLabor = serverIP.isHGLaborIP()
-                hgLaborChatMessages.add("${pair.first} isHGLaborIP=$lastHostWasHGLabor")
-                continue
-            } else {
-                hgLaborChatMessages.add("${pair.first} NULL")
-                continue
-            }
+            val serverIP = pair.first.split(" ").getOrNull(2) ?: continue
+            lastHostWasHGLabor = serverIP.isHGLaborIP()
+        } else if (lastHostWasHGLabor) { // other messages on hglabor
+            hgLaborMessages.add(pair.first)
         }
-
-        // val playerName = it.first.split(" ", limit = 4)[2]
-        hgLaborChatMessages.add("${pair.first} onLabor=$lastHostWasHGLabor")
     }
-    terminal.println(TextColors.brightGreen("\nExtracted HGLabor Messages: ${hgLaborChatMessages.size}"))
-    return hgLaborChatMessages
+
+    terminal.println(TextColors.brightGreen("\nExtracted HGLabor Messages: ${hgLaborMessages.size}"))
+    return hgLaborMessages
 }
 
 /**
@@ -113,13 +93,9 @@ fun HashSet<Pair<String, Boolean>>.extractHGLaborMessages(): MutableSet<String> 
 fun String.extractFromPath(fileName: String): MutableSet<Pair<String, Boolean>>? {
     val file = File(this)
     return when (file.extension) {
-        // zip file
         "zip" -> ZipFile(this).extractZipFile()
-        // gzip file
         "gz" -> file.extractGZipFile()
-        // file
         "log" -> file.extractFile()
-        // other, gets discarded
         else -> {
             terminal.println(TextColors.brightRed("""Wrong file type "${file.extension} file="$fileName" directory="$this""""))
             null
@@ -168,7 +144,7 @@ private fun ZipFile.extractZipFile(): MutableSet<Pair<String, Boolean>> {
  */
 
 private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String, Boolean>> {
-    val messages = mutableSetOf<Pair<String, Boolean>>()
+    val messages = hashSetOf<Pair<String, Boolean>>()
 
     this.forEachLine { line ->
         val messagePair = line.extract(date) ?: return@forEachLine
@@ -179,9 +155,7 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
 }
 
 /**
- * Trys to extract a valid message from a string
- * this is the core function, it is used to extract
- * messages from a buffered reader
+ * Trys to extract a valid public hglabor message from a string
  */
 
 /*private fun String.extract(date: String): Pair<String, Boolean>? {
@@ -223,17 +197,24 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
     return "$date $time $chatMessage" to true
 }*/
 
-private fun String.extract(date: String): Pair<String, Boolean> {
-    if (this.isBlank() || this.length < 24) return Pair("-1", false)
+/**
+ * Extracts all chat messages and connection messages
+ */
+
+private fun String.extract(date: String): Pair<String, Boolean>? {
+    if (this.isBlank() || this.length < 24) return null
 
     val time = LogExPatterns.time.find(this)?.value
-    val message = LogExPatterns.allChatMessages.find(this)?.value
+    val message = LogExPatterns.chatMessage.find(this)?.value
 
-    // connecting-messages
+    // connecting-message
     if (message == null) {
-        val connectingMessage = LogExPatterns.connecting.find(this)?.value ?: return Pair("-1", false)
-        return "$date $time $connectingMessage" to false
+        val connectingMessage = LogExPatterns.connecting.find(this)?.value ?: return null
+        var serverIP = connectingMessage.substring(16)
+        if (serverIP.endsWith('.')) serverIP = serverIP.dropLast(1)
+        return "$date $time $serverIP" to false
     }
 
-    return "$date $time $message" to true
+    val chatMessage = message.drop(9) // removes ": [CHAT] ", only the message content is left
+    return "$date $time $chatMessage" to true
 }
