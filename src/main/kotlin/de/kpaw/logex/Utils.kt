@@ -1,24 +1,50 @@
 package de.kpaw.logex
 
-import com.github.ajalt.mordant.rendering.TextColors
-import de.kpaw.logex.commands.Extract
+import com.github.ajalt.mordant.rendering.TextColors.*
+import com.github.ajalt.mordant.rendering.TextStyles
 import java.io.File
-import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
-import java.util.*
-import java.util.zip.GZIPInputStream
-import java.util.zip.ZipFile
+
+// wtf
+object LogExPatterns {
+    val logNameAsDate = Regex("""\d{4}-[01][0-9]-[0-3][0-9]""")
+    val time = Regex("""([012]\d:[0-5]\d:[0-5]\d)""")
+    val connecting = Regex(""": (?i)connecting to [a-zA-Z\d.-]*""")
+    val chatMessage = Regex(""": \[CHAT] (.*)""")
+    val privateChatMessages = arrayListOf(
+        // minec4ft_name ? to you ?  Das ist eine private Nachricht
+        // ? minec4ft_name ? to you ?  Peter Fox
+        // ? minec4ft_name ? minec4ft_name ?  787 meine Telefonnummer
+        // MSG ? minec4ft_name ? minec4ft_name ?  bist du ein mädchen?????
+        // you to ? minec4ft_name ?  Lass das niemandem erzählen!111
+        Regex("""(MSG )?(\? )?((\.?\w{3,16})|(you to)) \? ((\.?\w{3,16})|(to you)) \?  (.*)"""),
+        // You -> minec4ft_name: Kannst du HG kommen? Ist grad voll leer :(
+        // minec4ft_name -> You: Ähm...ich spiele lieber FFA hahaa
+        Regex("""((You)|(\.?\w{3,16})) -> ((You)|(\.?\w{3,16})): (.*)"""),
+        // You whisper to minec4ft_name: als ob XD
+        // You whisper to Nachts | minec4ft_name: ok
+        // You whisper to ? minec4ft_name: ups
+        Regex("""You whisper to ((.+ \| )|(\? ))?(\.?\w{3,16}): (.*)"""),
+        // minec4ft_name whispers to you: of course
+        // ? minec4ft_name whispers to you: so viele patterns
+        // RANG | minec4ft_name whispers to you: yes
+        Regex("""((.+ [|] )|(\? ))?(\.?\w{3,16}) whispers to you: (.*)"""),
+        // §d?§r §6you to §f? §minec4ft_name §8?§7  okyyyy bye
+        Regex("""§d\?§r §6you to §f\? §7(\.?\w{3,16}) §8\?§7  (.*)"""),
+        // §d?§r §minec4ft_name §f? §6to you §8?§7  tricks
+        Regex("""§d\?§r §7(\.?\w{3,16}) §f\? §6to you §8\?§7  (.*)""")
+    )
+}
 
 object TerminalMessages {
     fun noFilesFound(path: String) {
-        terminal.println(TextColors.brightRed("ERROR: There are no files in directory $path"))
+        terminal.println(brightRed("ERROR: There are no files in directory $path"))
     }
 
     fun directoryDoesntExist(path: String) {
-        terminal.println(TextColors.brightRed("ERROR: $path is not a directory"))
+        terminal.println(brightRed("ERROR: $path is not a directory"))
     }
 }
 
@@ -27,45 +53,49 @@ object Utils {
         val file = File("$outputPath$fileName.txt")
         val isFileCreated = file.createNewFile()
 
-        return if (isFileCreated) {
-            println("File named \"$fileName\" was created successfully in $outputPath")
-            file
+        val overwrite: Boolean
+
+        if (isFileCreated) {
+            terminal.println(brightGreen("""File named "$fileName" was created successfully in "$outputPath""""))
+            return file
         } else {
-            println("File named \"$fileName\" already exist in $outputPath")
-            println("Do you want to overwrite it?")
-            if (awaitConfirmation()) {
-                when (file.delete()) {
-                    true -> {
-                        val isCreated = file.createNewFile()
-                        if (isCreated) {
-                            println("File named \"$fileName\" was overwritten successfully in $outputPath")
-                            file
-                        } else {
-                            println("Could not create \"$fileName\" in $outputPath")
-                            null
-                        }
-                    }
-                    false -> {
-                        println("Could not overwrite file. Stopping.")
-                        null
-                    }
-                }
-            } else {
-                println("Stopping.")
-                null
-            }
+            terminal.println(brightRed("""File named "$fileName" already exist in "$outputPath""""))
+            terminal.println(brightRed("Do you want to overwrite it?"))
+            overwrite = awaitConfirmation()
         }
+
+        if (!overwrite) {
+            terminal.println(red("Stopping."))
+            return null
+        }
+
+        val fileDeleted = file.delete()
+        if (fileDeleted) {
+            val isCreated = file.createNewFile()
+
+            if (isCreated) {
+                terminal.println(brightGreen("""File named "$fileName" was overwritten successfully in "$outputPath""""))
+                return file
+            }
+
+            terminal.println(brightRed("""Could not create "$fileName" in "$outputPath""""))
+            return null
+        }
+
+        terminal.println(red("Could not overwrite file (mission permissions?). Stopping."))
+        return null
     }
 
+    // stolen from https://github.com/jakobkmar/pacmc/blob/main/src/main/kotlin/net/axay/pacmc/logging/Confirm.kt
     private fun awaitConfirmation(): Boolean {
-        print(" (yes / no) ")
+        print(" (${brightGreen("y")}es / ${brightRed("n")}o) ")
         var sure: Boolean? = null
         while (sure == null) {
             sure = when (readLine()) {
                 "y", "yes" -> true
                 "n", "no", null -> false
                 else -> {
-                    print("Please type in yes or no: ")
+                    print("Please type in ${brightGreen("y")}es ${TextStyles.bold("or")} ${brightRed("n")}o: ")
                     null
                 }
             }
@@ -76,7 +106,7 @@ object Utils {
 
 // get names of alle the things (files, directories) in this file
 fun File.pathContent(): MutableList<String>? {
-    val pathContent = this.list()
+    val pathContent = list()
     if (pathContent == null) {
         TerminalMessages.directoryDoesntExist(path = "$path/")
         return null
@@ -90,46 +120,9 @@ fun File.pathContent(): MutableList<String>? {
 }
 
 // gets the date from se file time
-fun FileTime.date() = this.toString().split("T")[0]
+fun FileTime.date() = toString().split("T")[0]
 
 // gets the creation time from an attribute of the file
-fun File.creationTimeFromAttr() = Files.readAttributes(this.toPath(), BasicFileAttributes::class.java)
-    .creationTime().date()
+fun File.creationTimeFromAttr() =
+    Files.readAttributes(toPath(), BasicFileAttributes::class.java).creationTime().date()
 
-// gets the creation time from mc log name
-fun String.creationTimeFromName() = this.split("-").dropLast(1).joinToString("-")
-
-fun String.isCreationDateFromAttrNeeded() = when {
-    this.contains("debug") -> true
-    this == "debug" -> true
-    this == "latest" -> true
-    else -> false
-}
-
-fun String.toCharset(): Charset = Charset.forName(this)
-
-// DECOMPRESSING / UNZIPPING
-// data class containing the decompressed content and more
-data class MinecraftLog(
-    val name: String,
-    val content: List<String>,
-    val creationDateFromAttributes: String
-) {
-    val creationDateFromName: String = name.creationTimeFromName()
-}
-
-// unzips files (.zip files)
-fun ZipFile.unzip(charset: Charset): MinecraftLog {
-    val entry = this.entries().toList().first() // getting the first entry, should be the log
-    val zipFileBytes = this.getInputStream(entry).readAllBytes()
-    val entryContent = String(zipFileBytes, charset).split("\n")
-    val creationTime = entry.toString().split("T")[0]
-    return MinecraftLog(entry.name, entryContent, creationTime)
-}
-
-// unzips gzip files (log.gz files)
-fun File.gunzip(charset: Charset): MinecraftLog {
-    val gzipFileBytes = GZIPInputStream(this.inputStream()).readAllBytes()
-    val gzipFileContent = String(gzipFileBytes, charset).split("\n")
-    return MinecraftLog(this.name, gzipFileContent, this.creationTimeFromAttr())
-}
