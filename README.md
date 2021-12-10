@@ -11,7 +11,7 @@ Keine Sorge, deine versauten Privat-Nachrichten (Msg's) werden nicht gesammelt..
 3. Öffne den entpackten Ordner `LogEx-2.1.0` und gehe anschließend in den Ordner `bin`
 4. Führe nun das Programm `LogEx` aus - auf Windows geht dies z.B. mit einem Doppelklick auf `LogEx.bat`
 5. Anschließend beginnt das Programm, mit dem heraus sammeln - der aktuelle Fortschritt wird dir über das Konsolenfenster angezeigt
-6. Zuletzt wird eine Datei auf eurem Desktop erstellt, welche die HGLabor Nachrichten enthält
+6. Zuletzt wird eine Datei auf eurem Desktop erstellt, welche die HGLabor Nachrichten enthält - sie heißt `HGLaborMessages_datum`
 
 Abhängig von der Leistung eures PCs und der Menge an Minecraft Logs, kann das sammeln wenige Sekunden bzw. Minuten dauern.
 (Ich habe für ca. 2000 Logs ungefähr 2-3 Minuten gebraucht.)
@@ -24,6 +24,7 @@ Ihr könnt das Programm auch direkt von der Konsole ausführen, das hat den Vort
 Außerdem werden euch mögliche Fehler angezeigt, ohne das sich die Konsole wieder schließt.
 
 1. Windowstaste drücken, dann `cmd` eingeben und die Konsole (das Programm was bei `cmd` kommt) öffnen
-2. In den Ordner gehen, in welchem das Programm enthalten ist (normalerweise der `Downloads`-Ordner): `cd Downloads\LogEx-2.1.0\bin` (in die Konsole eingeben)
+2. In den Ordner gehen, in welchem das Programm enthalten ist (normalerweise der `Downloads`-Ordner)
+   Gebe dafür `cd Downloads\LogEx-2.1.0\bin` in die Konsole ein
 3. Jetzt das Programm ausführen `LogEx.bat -h` (oder auf Linux: `./LogEx -h`),
 durch den Parameter `-h` wird euch die Hilfe angezeigt, ab hier solltet ihr euch selbst zurechtfinden ;)
