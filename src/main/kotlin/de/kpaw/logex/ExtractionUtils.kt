@@ -43,17 +43,18 @@ object LogExPatterns {
         // minec4ft_name -> You: Ähm...ich spiele lieber FFA hahaa
         Regex("""((You)|(\.?\w{3,16})) -> ((You)|(\.?\w{3,16})): (.*)"""),
         // You whisper to minec4ft_name: als ob XD
-        // You whisper to Nachts | minec4ft_name: ok
+        // You whisper to RANG | minec4ft_name: ok
         // You whisper to ? minec4ft_name: ups
         Regex("""You whisper to ((.+ \| )|(\? ))?(\.?\w{3,16}): (.*)"""),
         // minec4ft_name whispers to you: of course
         // ? minec4ft_name whispers to you: so viele patterns
+        // $ minec4ft_name whispers to you: Pirvat Nachricht hehe
         // RANG | minec4ft_name whispers to you: yes
-        Regex("""((.+ [|] )|(\? ))?(\.?\w{3,16}) whispers to you: (.*)"""),
+        Regex("""((.+ [|] )|(\? )|(\$ ))?(\.?\w{3,16}) whispers to you: (.*)"""),
         // §d?§r §6you to §f? §minec4ft_name §8?§7  okyyyy bye
         Regex("""§d\?§r §6you to §f\? §7(\.?\w{3,16}) §8\?§7  (.*)"""),
         // §d?§r §minec4ft_name §f? §6to you §8?§7  tricks
-        Regex("""§d\?§r §7(\.?\w{3,16}) §f\? §6to you §8\?§7  (.*)""")
+        Regex("""§d\?§r §7(\.?\w{3,16}) §f\? §6to you §8\?§7  (.*)"""),
     )
 }
 
