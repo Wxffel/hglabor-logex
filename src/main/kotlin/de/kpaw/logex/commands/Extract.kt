@@ -6,6 +6,8 @@ import com.github.ajalt.clikt.parameters.arguments.default
 import com.github.ajalt.clikt.parameters.options.check
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
+import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
 import com.github.ajalt.mordant.rendering.TextColors
@@ -17,6 +19,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 
 object Extract : CliktCommand(
@@ -46,6 +50,11 @@ object Extract : CliktCommand(
                 "Higher number = less coroutines = slower extracting, but resources are saved"
     ).int().check("Must >= 1") { it >= 1 }
 
+    private val charset by option(
+        "-cs", "-charset",
+        help = "Selects the charset with which the files will be read."
+    ).choice("utf_8", "iso").default("utf_8")
+
     override fun run() = extract()
 
     private fun extract() {
@@ -53,10 +62,12 @@ object Extract : CliktCommand(
         val actualInputPath = "$inputPath$DIR_DELIMITER"
         val actualBLCPath = "$inputPath$DIR_DELIMITER$BLC_LOGS_PATH$DIR_DELIMITER"
         val actualOutputPath = "$outputPath$DIR_DELIMITER"
+        actualCharset = if (charset == "iso") StandardCharsets.ISO_8859_1 else actualCharset
 
         terminal.println(brightMagenta("inputPath=$actualInputPath"))
         terminal.println(brightMagenta("outputPath=$actualOutputPath"))
         terminal.println(brightMagenta("outputFile=$outputFileName.txt"))
+        terminal.println(brightMagenta("charset=$actualCharset"))
         terminal.println(brightMagenta("SYSTEM_OS_NAME=$SYSTEM_OS_NAME"))
         terminal.println(brightMagenta("USER_HOME=$USER_HOME"))
         terminal.println(brightMagenta("MC_LOG_PATH=$actualInputPath"))
@@ -135,19 +146,19 @@ object Extract : CliktCommand(
 
         val hgLaborChatMessages = hgLaborChatMessagesVanilla.toSortedSet()
 
-        terminal.println(brightYellow("Extracting corrupted messages..."))
+        terminal.println(brightYellow("\nExtracting corrupted messages..."))
         val corruptedMessages = mutableSetOf<String>()
         for (line in hgLaborChatMessages) {
             val lineDate = line.split(" ")[0]
             if (corruptedLogs.contains(lineDate))
                 corruptedMessages.add(line)
         }
-        terminal.println(red("Corrupted messages: ${corruptedMessages.size}"))
+        terminal.println(brightRed("Corrupted messages: ${corruptedMessages.size}"))
 
-        terminal.println(brightYellow("Removing corrupted messages..."))
+        terminal.println(brightYellow("\nRemoving corrupted messages..."))
         hgLaborChatMessages.removeAll(corruptedMessages)
 
-        terminal.println("${brightBlue("HGLabor messages without corrupted messages: ")}${cyan("${hgLaborChatMessages.size}")}")
+        terminal.println("${brightBlue("HGLabor messages without corrupted messages: ")}${brightCyan("${hgLaborChatMessages.size}")}")
 
         terminal.println(brightYellow("\nWriting messages to file..."))
         for (message in hgLaborChatMessages) {

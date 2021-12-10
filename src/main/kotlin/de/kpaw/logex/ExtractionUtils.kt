@@ -13,8 +13,6 @@ import kotlin.io.path.Path
 
 const val HGLABOR_START_DATE = "2020-01-01-1"
 
-val DEFAULT_CHARSET: Charset = StandardCharsets.ISO_8859_1 // or utf
-
 val CURRENT_DATE = LocalDate.now().toString()
 val SYSTEM_OS_NAME: String = System.getProperty("os.name")
 val USER_HOME: String = System.getProperty("user.home")
@@ -35,6 +33,8 @@ val BLC_LOGS_PATH = if (SYSTEM_OS_NAME == "Windows 10") {
     Path("""\blclient\minecraft""")
 } else Path("blclient/minecraft")
 
+// or ISO_8859_1
+var actualCharset: Charset = StandardCharsets.UTF_8
 
 val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
 val hgLaborDomains = arrayListOf("hglabor.de", "hglabor.lol", "pvplabor.net")
@@ -87,7 +87,7 @@ fun String.extractFromPath(fileName: String): MutableSet<Pair<String, Boolean>>?
 
 private fun File.extractFile(): MutableSet<Pair<String, Boolean>> {
     val date = LogExPatterns.logNameAsDate.find(name)?.value ?: creationTimeFromAttr()
-    return bufferedReader(DEFAULT_CHARSET).extractMessages(date)
+    return bufferedReader(actualCharset).extractMessages(date)
 }
 
 /**
@@ -96,7 +96,7 @@ private fun File.extractFile(): MutableSet<Pair<String, Boolean>> {
 
 private fun File.extractGZipFile(): MutableSet<Pair<String, Boolean>> {
     val date = LogExPatterns.logNameAsDate.find(name)?.value ?: creationTimeFromAttr()
-    return GZIPInputStream(inputStream()).bufferedReader(DEFAULT_CHARSET).extractMessages(date)
+    return GZIPInputStream(inputStream()).bufferedReader(actualCharset).extractMessages(date)
 }
 
 /**
@@ -106,7 +106,7 @@ private fun File.extractGZipFile(): MutableSet<Pair<String, Boolean>> {
 private fun ZipFile.extractZipFile(): MutableSet<Pair<String, Boolean>> {
     val entry = entries().toList().first() // getting the first entry, should be the log
     val date = LogExPatterns.logNameAsDate.find(name)?.value ?: entry.creationTime.date()
-    return getInputStream(entry).bufferedReader(DEFAULT_CHARSET).extractMessages(date)
+    return getInputStream(entry).bufferedReader(actualCharset).extractMessages(date)
 }
 
 /**
