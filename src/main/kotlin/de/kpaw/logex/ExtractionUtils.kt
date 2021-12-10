@@ -114,15 +114,47 @@ private fun ZipFile.extractZipFile(): MutableSet<Pair<String, Boolean>> {
  * from files, zip files and gzip files.
  */
 
+val corruptedLogs = mutableSetOf<String>()
 private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String, Boolean>> {
     val messages = hashSetOf<Pair<String, Boolean>>()
 
+    /**
+     * THIS LITTLE DUDE DETECTS A CORRUPTED LOG
+     * A LOG IS CORRUPTED (FOR ME AT LEAST) IF THE TIMESTAMP AFTER THE CURRENT MESSAGE
+     * IS LOWER/BEFORE/SMALLER THAN THE TIMESTAMP OF  THE CURRENT MESSAGE
+     * THIS IS ESSENTIAL
+     */
+
+    var lastTimeStamp = "-1"
+    var corrupted = false
+
     forEachLine { line ->
+
+        if (corrupted)
+            return@forEachLine
+
         val messagePair = line.extract(date) ?: return@forEachLine
+
+        val timeStamp = messagePair.first.split(" ")[1]
+
+        if (lastTimeStamp == "-1") {
+            lastTimeStamp = timeStamp
+        }
+
+        if (timeStamp < lastTimeStamp) {
+            terminal.println(TextColors.red("FILE CORRUPTED: fileDate=$date message=${messagePair.first}"))
+            corrupted = true
+            return@forEachLine
+        }
+
         messages.add(messagePair)
     }
 
-    return messages
+    return if (corrupted) {
+        corruptedLogs.add(date)
+        mutableSetOf()
+    }
+    else messages
 }
 
 /**

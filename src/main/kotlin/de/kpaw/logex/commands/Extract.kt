@@ -135,6 +135,20 @@ object Extract : CliktCommand(
 
         val hgLaborChatMessages = hgLaborChatMessagesVanilla.toSortedSet()
 
+        terminal.println(brightYellow("Extracting corrupted messages..."))
+        val corruptedMessages = mutableSetOf<String>()
+        for (line in hgLaborChatMessages) {
+            val lineDate = line.split(" ")[0]
+            if (corruptedLogs.contains(lineDate))
+                corruptedMessages.add(line)
+        }
+        terminal.println(red("Corrupted messages: ${corruptedMessages.size}"))
+
+        terminal.println(brightYellow("Removing corrupted messages..."))
+        hgLaborChatMessages.removeAll(corruptedMessages)
+
+        terminal.println("${brightBlue("HGLabor messages without corrupted messages: ")}${cyan("${hgLaborChatMessages.size}")}")
+
         terminal.println(brightYellow("\nWriting messages to file..."))
         for (message in hgLaborChatMessages) {
             outputFile.appendText("$message\n")
