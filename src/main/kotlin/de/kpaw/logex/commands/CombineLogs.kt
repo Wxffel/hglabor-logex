@@ -9,7 +9,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 
 object CombineLogs : CliktCommand(
-    help = "Combines two txts"
+    help = "Combines two files."
 ) {
     private val inputPath by argument(help = "The folder containing the files to be combined").path(
         mustExist = true, canBeFile = false
