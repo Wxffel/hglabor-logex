@@ -134,9 +134,9 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
             return@forEachLine
 
         val messagePair = line.extract(date) ?: return@forEachLine
-
         val timeStamp = messagePair.first.split(" ")[1]
 
+        // only executed ones - sets the first timestamp
         if (lastTimeStamp == "-1") {
             lastTimeStamp = timeStamp
         }
@@ -144,10 +144,10 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
         if (timeStamp < lastTimeStamp) {
             terminal.println(TextColors.red("FILE CORRUPTED: fileDate=$date message=${messagePair.first}"))
             corrupted = true
-            return@forEachLine
+        } else {
+            lastTimeStamp = timeStamp
+            messages.add(messagePair)
         }
-
-        messages.add(messagePair)
     }
 
     return if (corrupted) {
