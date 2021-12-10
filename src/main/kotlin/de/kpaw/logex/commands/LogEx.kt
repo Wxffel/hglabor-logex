@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object LogEx : CliktCommand(
     help = "Extracts all public messages sent on HGLabor."
 ) {
-    private val inputPath by argument(help = "The path of the folder to extract lines from").path(
+    private val inputPath by argument(help = "The path to the directory containing the logs").path(
         mustExist = true, canBeFile = false
     ).default(MC_LOGS_PATH)
 
@@ -33,23 +33,22 @@ object LogEx : CliktCommand(
 
     private val outputFileName by option(
         "-of", "--outputfilename",
-        help = "The name of the file with the extracted lines"
+        help = "The name of the file which will contain the hglabor-messages"
     ).default("HGLaborMessages_$CURRENT_DATE")
 
     private val startDate by option(
         "-sd", "--startdate",
-        help = "Only extracts files after the start date (yyyy-mm-dd) ansonsten gl haha"
+        help = "Only extracts files after the start date (yyyy-mm-dd) (<- ansonsten gl haha)"
     ).default(HGLABOR_START_DATE)
 
     private val chunksPerCoroutine by option(
         "-cpc", "-chunkspercoroutine",
-        help = "Amount of files one coroutine processes, default: 200." +
-                "Higher number = less coroutines = slower extracting, but resources are saved"
+        help = "Anzahl der Dateien pro Coroutine (Weniger Dateien = mehr Coroutines = schneller). Default: 200"
     ).int().check("Must >= 1") { it >= 1 }
 
     private val charset by option(
         "-cs", "-charset",
-        help = "Selects the charset with which the files will be read."
+        help = "Charset for reading logs. iso or utf_8 (default)"
     ).choice("utf_8", "iso").default("utf_8")
 
     override fun run() = extract()
