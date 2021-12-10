@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "de.kpaw"
-version = "2.0.0"
+version = "2.0.0-clickable"
 
 description = "A program to extract chat messages sent on HGLabor from minecraft logs."
 
