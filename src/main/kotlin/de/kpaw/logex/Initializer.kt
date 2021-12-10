@@ -7,8 +7,8 @@ import java.lang.Exception
 
 fun main(args: Array<String>) = try {
     LogEx.main(args)
-} catch (exception: Exception) {
-    exception.printStackTrace()
+} catch (e: Exception) {
+    e.printStackTrace()
     terminal.println(TextColors.brightRed("An error occurred!"))
 }
 
