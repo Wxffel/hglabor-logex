@@ -27,12 +27,12 @@ application {
 
 tasks {
     withType<JavaCompile> {
-        targetCompatibility = "11"
-        options.release.set(11)
+        targetCompatibility = "1.8"
+        options.release.set(8)
         options.encoding = "UTF-8"
     }
 
     withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = "1.8"
     }
 }
