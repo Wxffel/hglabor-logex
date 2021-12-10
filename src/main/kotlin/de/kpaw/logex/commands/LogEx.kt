@@ -6,6 +6,6 @@ import com.github.ajalt.clikt.core.subcommands
 object LogEx : CliktCommand(
     help = "The root command of logex"
 ) {
-    init { subcommands(Extract, CombineLogs) }
+    init { subcommands(Extract) }
     override fun run() = Unit
 }
