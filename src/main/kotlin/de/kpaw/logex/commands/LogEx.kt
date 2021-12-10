@@ -150,6 +150,8 @@ object LogEx : CliktCommand(
             if (corruptedLogs.contains(lineDate))
                 corruptedMessages.add(line)
         }
+
+        terminal.println(brightRed("Corrupted Files: ${corruptedLogs.size}"))
         terminal.println(brightRed("Corrupted messages: ${corruptedMessages.size}"))
 
         terminal.println(brightYellow("\nRemoving corrupted messages..."))
