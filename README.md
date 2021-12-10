@@ -1,2 +1,5 @@
-# hglabor log extractor
-This command line program can extract chat messages send on the Minecraft server "HGLabor"
+# HGLabor-Log-Extractor
+
+Das Programm durchläuft einmalig deine Minecraft-Logs und sammelt alle Nachrichten heraus, die auf HGLabor geschrieben wurden.
+Keine Sorge, deine versauten Privat-Nachrichten (Msg's) werden nicht gesammelt..
+
