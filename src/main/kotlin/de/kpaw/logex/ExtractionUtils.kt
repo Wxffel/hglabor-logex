@@ -16,22 +16,12 @@ const val HGLABOR_START_DATE = "2020-01-01-1"
 val CURRENT_DATE = LocalDate.now().toString()
 val SYSTEM_OS_NAME: String = System.getProperty("os.name")
 val USER_HOME: String = System.getProperty("user.home")
-
-val DIR_DELIMITER = if (SYSTEM_OS_NAME == "Windows 10") {
-    """\"""
-} else "/"
-
-val USER_DESKTOP_PATH = if (SYSTEM_OS_NAME == "Windows 10") {
-    Path("""$USER_HOME\Desktop""")
-} else Path("$USER_HOME/Desktop")
-
+val USER_DESKTOP_PATH = Path("$USER_HOME/Desktop")
 val MC_LOGS_PATH = if (SYSTEM_OS_NAME == "Windows 10") {
-    Path("""$USER_HOME\AppData\Roaming.minecraft\logs""")
+    Path("""$USER_HOME\AppData\Roaming\.minecraft\logs""")
 } else Path("$USER_HOME/.minecraft/logs")
 
-val BLC_LOGS_PATH = if (SYSTEM_OS_NAME == "Windows 10") {
-    Path("""\blclient\minecraft""")
-} else Path("blclient/minecraft")
+val BLC_LOGS_PATH = Path("blclient/minecraft")
 
 // or ISO_8859_1
 var actualCharset: Charset = StandardCharsets.UTF_8

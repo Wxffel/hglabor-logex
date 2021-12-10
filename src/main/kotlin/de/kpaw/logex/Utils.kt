@@ -7,7 +7,6 @@ import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 
-// wtf
 object LogExPatterns {
     val logNameAsDate = Regex("""\d{4}-[01][0-9]-[0-3][0-9]""")
     val time = Regex("""([012]\d:[0-5]\d:[0-5]\d)""")
@@ -89,7 +88,7 @@ object Utils {
 
     // stolen from https://github.com/jakobkmar/pacmc/blob/main/src/main/kotlin/net/axay/pacmc/logging/Confirm.kt
     private fun awaitConfirmation(): Boolean {
-        print(" (${brightGreen("y")}es / ${brightRed("n")}o) ")
+        print(" (yes / no) ")
         var sure: Boolean? = null
         while (sure == null) {
             sure = when (readLine()) {
@@ -109,11 +108,11 @@ object Utils {
 fun File.pathContent(): MutableList<String>? {
     val pathContent = list()
     if (pathContent == null) {
-        TerminalMessages.directoryDoesntExist(path = "$path/")
+        TerminalMessages.directoryDoesntExist(path)
         return null
     } else return when {
         pathContent.isEmpty() -> {
-            TerminalMessages.noFilesFound(path = "$path/")
+            TerminalMessages.noFilesFound(path)
             return null
         }
         else -> pathContent.toMutableList()
