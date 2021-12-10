@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 
 object LogEx : CliktCommand(
-    help = "Extracts specified lines of files"
+    help = "Extracts all public messages sent on HGLabor."
 ) {
     private val inputPath by argument(help = "The path of the folder to extract lines from").path(
         mustExist = true, canBeFile = false
@@ -56,9 +56,9 @@ object LogEx : CliktCommand(
 
     private fun extract() {
 
-        val actualInputPath = "$inputPath$DIR_DELIMITER"
-        val actualBLCPath = "$inputPath$DIR_DELIMITER$BLC_LOGS_PATH$DIR_DELIMITER"
-        val actualOutputPath = "$outputPath$DIR_DELIMITER"
+        val actualInputPath = "$inputPath/"
+        val actualBLCPath = "$inputPath/$BLC_LOGS_PATH/"
+        val actualOutputPath = "$outputPath/"
         actualCharset = if (charset == "iso") StandardCharsets.ISO_8859_1 else actualCharset
 
         terminal.println(brightMagenta("inputPath=$actualInputPath"))
@@ -166,7 +166,7 @@ object LogEx : CliktCommand(
 
         terminal.println(brightGreen("Finished! Thanks.\n"))
 
-        terminal.println("\nPress any key to close this window...")
+        terminal.println("\nPress any key to stop the program and close this window...")
         readLine()
     }
 }
