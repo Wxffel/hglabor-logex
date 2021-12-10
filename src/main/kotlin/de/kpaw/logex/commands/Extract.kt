@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
+import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextColors.*
 import de.kpaw.logex.*
 import kotlinx.coroutines.Dispatchers
@@ -78,8 +79,10 @@ object Extract : CliktCommand(
 
         terminal.println(brightYellow("Too old vanilla logs: ${tooOld.size} (before $startDate)"))
         terminal.println(brightYellow("Too old blc logs: ${tooOldBLC.size} (before $startDate)"))
+        terminal.println(brightYellow("\nExtracting files..."))
 
-        val messageHolder = mutableSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
+        val messageHolderVanilla = mutableSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
+        val messageHolderBLC = mutableSetOf<Pair<String, Boolean>>() // String=Content, Boolean=IS_CHAT_MESSAGE
         val extractedFiles = AtomicInteger()
 
         runBlocking(Dispatchers.IO) {
@@ -88,7 +91,12 @@ object Extract : CliktCommand(
             val inputStringsChunked = inputStrings.chunked(chunkedSize)
             val blcStringChunked = blcStrings.chunked(chunkedSize)
 
-            suspend fun extractFromChunks(chunks: List<List<String>>, filePath: String, mutex: Mutex) {
+            suspend fun extractFromChunks(
+                chunks: List<List<String>>,
+                filePath: String,
+                messageHolder: MutableSet<Pair<String, Boolean>>,
+                mutex: Mutex
+            ) {
                 launch {
                     for (chunk in chunks) {
                         launch {
@@ -107,17 +115,25 @@ object Extract : CliktCommand(
                     }
                 }
             }
-            extractFromChunks(inputStringsChunked, actualInputPath, mutex)
-            extractFromChunks(blcStringChunked, actualBLCPath, mutex)
+            extractFromChunks(inputStringsChunked, actualInputPath, messageHolderVanilla, mutex)
+            extractFromChunks(blcStringChunked, actualBLCPath, messageHolderBLC, mutex)
         }
 
         terminal.println("${brightBlue("Extracted files: ")}${brightCyan("$extractedFiles")}")
-        terminal.println("${brightBlue("Extracted messages: ")}${brightCyan("${messageHolder.size}")}")
+        terminal.println("${brightBlue("Extracted messages vanilla logs: ")}${brightCyan("${messageHolderVanilla.size}")}")
+        terminal.println("${brightBlue("Extracted messages blc logs: ")}${brightCyan("${messageHolderBLC.size}")}")
 
         val outputFile = Utils.createFile(actualOutputPath, outputFileName) ?: return
 
         terminal.println(brightYellow("\nExtracting HGLabor messages..."))
-        val hgLaborChatMessages = messageHolder.extractMessagesOnHGLabor()
+        val hgLaborChatMessagesVanilla = messageHolderVanilla.extractMessagesOnHGLabor()
+        terminal.println(brightGreen("Extracted HGLabor messages (vanilla logs): ${hgLaborChatMessagesVanilla.size}"))
+        val hgLaborChatMessagesBLC = messageHolderBLC.extractMessagesOnHGLabor()
+        terminal.println(brightGreen("Extracted HGLabor messages (blc logs): ${hgLaborChatMessagesBLC.size}"))
+
+        hgLaborChatMessagesVanilla.addAll(hgLaborChatMessagesBLC)
+
+        val hgLaborChatMessages = hgLaborChatMessagesVanilla.toSortedSet()
 
         terminal.println(brightYellow("\nWriting messages to file..."))
         for (message in hgLaborChatMessages) {

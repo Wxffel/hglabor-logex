@@ -12,6 +12,7 @@ object LogExPatterns {
     val logNameAsDate = Regex("""\d{4}-[01][0-9]-[0-3][0-9]""")
     val time = Regex("""([012]\d:[0-5]\d:[0-5]\d)""")
     val connecting = Regex(""": (?i)connecting to [a-zA-Z\d.-]*""")
+    val stopping = Regex(""": Stopping!""")
     val chatMessage = Regex(""": \[CHAT] (.*)""")
     val privateChatMessages = arrayListOf(
         // minec4ft_name ? to you ?  Das ist eine private Nachricht

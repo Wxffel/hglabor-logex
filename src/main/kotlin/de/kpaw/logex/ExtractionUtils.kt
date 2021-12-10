@@ -53,15 +53,14 @@ fun Collection<Pair<String, Boolean>>.extractMessagesOnHGLabor(): MutableSet<Str
     var lastHostWasHGLabor = false
 
     for (pair in sortedSet) {
-        if (!pair.second) { // connecting message
+        if (!pair.second) { // connecting message OR stopping message
             val serverIP = pair.first.split(" ").getOrNull(2) ?: continue
-            lastHostWasHGLabor = serverIP.isHGLaborIP()
+            lastHostWasHGLabor = serverIP.isHGLaborIP() // a stopping message will intentionally return "false"
         } else if (lastHostWasHGLabor) { // a message sent on hglabor
             hgLaborMessages.add(pair.first)
         }
     }
 
-    terminal.println(TextColors.brightGreen("Extracted HGLabor messages: ${hgLaborMessages.size}"))
     return hgLaborMessages
 }
 
@@ -138,10 +137,15 @@ private fun String.extract(date: String): Pair<String, Boolean>? {
 
     // connecting-message
     if (message == null) {
-        val connectingMessage = LogExPatterns.connecting.find(this)?.value ?: return null
-        var serverIP = connectingMessage.substring(16)
-        if (serverIP.endsWith('.')) serverIP = serverIP.dropLast(1)
-        return "$date $time $serverIP" to false
+        val connectingMessage = LogExPatterns.connecting.find(this)?.value
+        if (connectingMessage != null) {
+            var serverIP = connectingMessage.substring(16)
+            if (serverIP.endsWith('.')) serverIP = serverIP.dropLast(1)
+            return "$date $time $serverIP" to false
+        }
+        // a stopping-message indicates the end of a log, at such messages we will later reset the "last-ip" boolean
+        val stoppingMessage = LogExPatterns.stopping.find(this)?.value ?: return null
+        return "$date $time ${stoppingMessage.drop(2)}" to false
     }
 
     // removes ": [CHAT] " so only the message content is left
