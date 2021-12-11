@@ -58,7 +58,7 @@ object LogEx : CliktCommand(
         val actualInputPath = "$inputPath/"
         val actualBLCPath = "$inputPath/$BLC_LOGS_PATH/"
         val actualOutputPath = "$outputPath/"
-        actualCharset = if (charset == "iso") StandardCharsets.ISO_8859_1 else actualCharset
+        actualCharset = if (charset == "iso") StandardCharsets.ISO_8859_1 else StandardCharsets.UTF_8
 
         terminal.println(brightMagenta("inputPath=$actualInputPath"))
         terminal.println(brightMagenta("outputPath=$actualOutputPath"))
