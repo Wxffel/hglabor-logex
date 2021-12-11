@@ -26,5 +26,6 @@ Außerdem werden euch mögliche Fehler angezeigt, ohne das sich die Konsole wied
 1. Windowstaste drücken, dann `cmd` eingeben und die Konsole (das Programm was bei `cmd` kommt) öffnen
 2. In den Ordner gehen, in welchem das Programm enthalten ist (normalerweise der `Downloads`-Ordner)
 Gib dafür `cd Downloads\LogEx-2.1.0\bin` in die Konsole ein
-3. Jetzt das Programm ausführen `LogEx.bat -h` (oder auf Linux: `./LogEx -h`),
-durch den Parameter `-h` wird euch die Hilfe angezeigt, ab hier solltet ihr euch selbst zurechtfinden ;)
+3. Jetzt das Programm per command ausführen; Windows: `LogEx.bat`, Linux: `./LogEx`
+- Wenn keine Parameter angegeben werden, wird das Programm mit Standartwerten ausgeführt, normalerweise sollte das reichen
+- Mit der Option `-h` (Windows: `LogEx.bat -h`, Linux: `./LogEx -h`), wird euch die Hilfe angezeigt, ab hier solltet ihr euch selbst zurechtfinden ;)
