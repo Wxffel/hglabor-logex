@@ -21,7 +21,8 @@ val MC_LOGS_PATH = if (SYSTEM_OS_NAME == "Windows 10") {
     Path("""$USER_HOME\AppData\Roaming\.minecraft\logs""")
 } else Path("$USER_HOME/.minecraft/logs")
 
-var actualCharset: Charset = StandardCharsets.UTF_8 // or ISO_8859_1
+// alternative is utf_8, but iso works right for logs
+var actualCharset: Charset = StandardCharsets.ISO_8859_1
 
 val hgLaborIPs = arrayListOf("178.32.80.96", "213.32.61.248")
 val hgLaborDomains = arrayListOf("hglabor.de", "hglabor.lol", "pvplabor.net")
@@ -173,8 +174,7 @@ private fun BufferedReader.extractMessages(date: String): MutableSet<Pair<String
     return if (corrupted) {
         corruptedLogs.add(date)
         mutableSetOf()
-    }
-    else messages
+    } else messages
 }
 
 /**
